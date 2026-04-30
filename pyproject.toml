@@ -1,0 +1,27 @@
+# Top-level config-only file. The two real packages live under server/ and client/, each with
+# its own pyproject.toml. This file exists only to house shared linter / type-checker / pytest
+# config so both packages stay consistent. Install both packages editable in one venv with:
+#
+#     pip install -e "./server[dev]" -e "./client[dev]" ruff mypy
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["server/tests", "client/tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ANN", "RUF"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = ["server/src", "client/src"]
+packages = ["pype_server", "pype_client"]
