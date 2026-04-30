@@ -88,6 +88,9 @@ def client_claims(
     client_secret = claims.get("client_secret")
     if (
         not isinstance(name, str)
+        # `bool` is a subclass of `int` in Python, so `isinstance(True, int)` is True.
+        # A JWT carrying `client_id: true` would otherwise pass the int check below;
+        # explicitly rejecting bools keeps id semantics tight.
         or not isinstance(client_id, int)
         or isinstance(client_id, bool)
         or not isinstance(client_secret, str)

@@ -60,8 +60,3 @@ Because of this `ClientRegistry` implementation should pay special attention to 
     - the invariant ClientEntry.request_id == index inti _entries[] still holds
 
 Now the reaper that checks the client_registry periodically and evicts inactive clients does not have to take a snapshot of keys. It can directly operate on the _entries[] array inside the ClientRegistry without any fear of corruption as long as it knows to ignore any ints it encouters in the _entries[]. These are essentially next-> pointers of our free list
-
-    
-
-
-- Now lets

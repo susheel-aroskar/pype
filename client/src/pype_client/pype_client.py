@@ -272,7 +272,7 @@ class ClientConnection:
     def get_all_responses(
         self, *request_ids: str, timeout: int | None = None
     ) -> dict[str, ServiceResponse]:
-        """Return only wh)en ALL of `*request_ids` are available. Pops all of them."""
+        """Return only when ALL of `*request_ids` are available. Pops all of them."""
         self._ensure_open()
         if not request_ids:
             raise ValueError("at least one request_id is required")
