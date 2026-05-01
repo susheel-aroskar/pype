@@ -55,10 +55,11 @@ class PypeClient:
 
         try:
             access_token = data["access_token"]
-            client_id = int(data["client_id"])
-            client_secret = data["client_secret"]
+            client_id = data["client_id"]
             name = data["name"]
-        except (KeyError, TypeError, ValueError) as exc:
+            if not isinstance(client_id, str) or not client_id:
+                raise TypeError("client_id must be a non-empty string")
+        except (KeyError, TypeError) as exc:
             session.close()
             raise PypeProtocolError(f"malformed auth response: {data!r}") from exc
 
@@ -67,7 +68,6 @@ class PypeClient:
             base_url=self._base_url,
             name=name,
             client_id=client_id,
-            client_secret=client_secret,
             access_token=access_token,
             session=session,
             settings=self._settings,
@@ -85,8 +85,7 @@ class ClientConnection:
         self,
         base_url: str,
         name: str,
-        client_id: int,
-        client_secret: str,
+        client_id: str,
         access_token: str,
         session: requests.Session,
         settings: Settings,
@@ -94,7 +93,6 @@ class ClientConnection:
         self._base_url = base_url
         self.name = name
         self.client_id = client_id
-        self.client_secret = client_secret
         self.access_token = access_token
         self._session = session
         self._settings = settings

@@ -20,10 +20,9 @@ async def test_full_request_response_roundtrip(client: AsyncClient) -> None:
         assert r.status_code == 200
         n = int(r.content)
         client_id = r.headers["x-pype-client-id"]
-        client_secret = r.headers["x-pype-client-secret"]
         request_id = r.headers["x-pype-request-id"]
         await client.post(
-            f"/clients/{client_id}?client_secret={client_secret}&request_id={request_id}",
+            f"/clients/{client_id}?request_id={request_id}",
             headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
             content=str(n * 2).encode(),
         )
@@ -74,12 +73,12 @@ async def test_responses_can_arrive_out_of_order(client: AsyncClient) -> None:
     assert r2.headers["x-pype-request-id"] == "second"
 
     await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=second",
+        f"/clients/{cl['client_id']}?request_id=second",
         headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
         content=b"two",
     )
     await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=first",
+        f"/clients/{cl['client_id']}?request_id=first",
         headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
         content=b"one",
     )

@@ -17,7 +17,7 @@ async def test_post_response_to_client_returns_202(client: AsyncClient) -> None:
     cl = await _auth_client(client)
     svc = await _auth_service(client, "echo")
     r = await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=r1",
+        f"/clients/{cl['client_id']}?request_id=r1",
         headers={**auth_header(str(svc["access_token"])), "Content-Type": "application/json"},
         content=b'{"ok": true}',
     )
@@ -27,28 +27,18 @@ async def test_post_response_to_client_returns_202(client: AsyncClient) -> None:
 async def test_post_returns_410_when_client_queue_gone(client: AsyncClient) -> None:
     svc = await _auth_service(client, "echo")
     r = await client.post(
-        "/clients/9999?client_secret=anything&request_id=r1",
+        # Random-string id that was never registered.
+        "/clients/nonexistent-fake-id-no-such-client?request_id=r1",
         headers=auth_header(str(svc["access_token"])),
         content=b"",
     )
     assert r.status_code == 410
 
 
-async def test_post_returns_403_when_client_secret_mismatches(client: AsyncClient) -> None:
-    cl = await _auth_client(client)
-    svc = await _auth_service(client, "echo")
-    r = await client.post(
-        f"/clients/{cl['client_id']}?client_secret=wrong&request_id=r1",
-        headers=auth_header(str(svc["access_token"])),
-        content=b"",
-    )
-    assert r.status_code == 403
-
-
 async def test_post_requires_service_jwt(client: AsyncClient) -> None:
     cl = await _auth_client(client)
     r = await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=r1",
+        f"/clients/{cl['client_id']}?request_id=r1",
         headers=auth_header(str(cl["access_token"])),  # client token, not service
         content=b"",
     )
@@ -93,7 +83,7 @@ async def test_post_get_roundtrip_preserves_request_id_and_content_type(
     svc = await _auth_service(client, "echo")
     payload = b"binary\x00\xff"
     await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=req-7",
+        f"/clients/{cl['client_id']}?request_id=req-7",
         headers={
             **auth_header(str(svc["access_token"])),
             "Content-Type": "application/octet-stream",
@@ -117,7 +107,7 @@ async def test_get_blocks_until_response_arrives(client: AsyncClient) -> None:
     async def post_after_delay() -> None:
         await asyncio.sleep(0.05)
         await client.post(
-            f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=late",
+            f"/clients/{cl['client_id']}?request_id=late",
             headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
             content=b"hi",
         )
@@ -142,7 +132,7 @@ async def test_responses_are_returned_in_fifo_order_per_client_queue(
     svc = await _auth_service(client, "echo")
     for i, body in enumerate([b"a", b"b", b"c"]):
         r = await client.post(
-            f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=r{i}",
+            f"/clients/{cl['client_id']}?request_id=r{i}",
             headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
             content=body,
         )
@@ -182,7 +172,7 @@ async def test_post_does_not_bump_last_seen(app: object, client: AsyncClient) ->
     before = entry.last_seen
     await asyncio.sleep(0.02)
     r = await client.post(
-        f"/clients/{cl['client_id']}?client_secret={cl['client_secret']}&request_id=r1",
+        f"/clients/{cl['client_id']}?request_id=r1",
         headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
         content=b"x",
     )

@@ -10,8 +10,9 @@ async def test_client_auth_returns_jwt_and_claims(client: AsyncClient) -> None:
     assert body["token_type"] == "Bearer"
     assert body["role"] == "client"
     assert body["name"] == "alice"
-    assert isinstance(body["client_id"], int) and body["client_id"] >= 1
-    assert isinstance(body["client_secret"], str) and len(body["client_secret"]) >= 32
+    # client_id is a 256-bit URL-safe random string that doubles as the capability.
+    assert isinstance(body["client_id"], str) and len(body["client_id"]) >= 32
+    assert "client_secret" not in body  # no separate secret in this design
     assert isinstance(body["access_token"], str) and body["access_token"]
 
 
@@ -19,7 +20,6 @@ async def test_client_ids_are_unique(client: AsyncClient) -> None:
     a = (await client.post("/auth/client", json={"name": "a"})).json()
     b = (await client.post("/auth/client", json={"name": "b"})).json()
     assert a["client_id"] != b["client_id"]
-    assert a["client_secret"] != b["client_secret"]
 
 
 async def test_client_logoff_succeeds(client: AsyncClient) -> None:

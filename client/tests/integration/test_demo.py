@@ -155,23 +155,22 @@ def banner(message: str) -> None:
 #
 #                  Crucially, the `request` object carries with it the
 #                  identity of the originating client (`client_id`,
-#                  `client_secret`, `request_id`) — these were stamped onto
-#                  it by the pype server when it dequeued it. The service
-#                  doesn't have to know "who called"; it just sees the
-#                  request and reads the headers if it needs them.
+#                  `request_id`) — these were stamped onto it by the pype
+#                  server when it dequeued the request. The service doesn't
+#                  have to know "who called"; it just sees the request and
+#                  reads the headers if it needs them.
 #
 #           b. (do work — JSON-decode, compute, whatever)
 #
 #           c. `request.send_response(payload, content_type, ...)`
 #                  POSTs back to /clients/{request.client_id} on pype with
-#                  the response payload. The library uses the `client_id`,
-#                  `client_secret`, and `request_id` already captured on the
-#                  ClientRequest object — the service code never has to
-#                  manage routing addresses, JWTs of the original caller, or
-#                  any other "where do I send this back" plumbing. Pype
-#                  enqueues the response on the originating client's
-#                  per-client queue, where it waits for the client to pull
-#                  it.
+#                  the response payload. The library uses the `client_id`
+#                  and `request_id` already captured on the ClientRequest
+#                  object — the service code never has to manage routing
+#                  addresses, JWTs of the original caller, or any other
+#                  "where do I send this back" plumbing. Pype enqueues the
+#                  response on the originating client's per-client queue,
+#                  where it waits for the client to pull it.
 #
 # WHY THIS IS NICE
 # ----------------
@@ -294,11 +293,11 @@ class BinaryEchoService(BackendService):
         )
         # ─── send_response routes back to the originating client automatically ───
         # Notice we don't tell pype "where" to send this response. The
-        # `client_request` object already knows: it captured `client_id`,
-        # `client_secret`, and `request_id` from the response headers when it
-        # was pulled. `send_response` just POSTs the payload to
-        # /clients/{client_request.client_id} on pype, with the right query
-        # params, and pype enqueues it on that client's per-client queue.
+        # `client_request` object already knows: it captured `client_id` and
+        # `request_id` from the response headers when it was pulled.
+        # `send_response` just POSTs the payload to
+        # /clients/{client_request.client_id} on pype, with `request_id` as a
+        # query param, and pype enqueues it on that client's per-client queue.
         # ─────────────────────────────────────────────────────────────────────────
         client_request.send_response(
             client_request.bytes, content_type=client_request.content_type

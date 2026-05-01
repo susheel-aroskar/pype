@@ -127,7 +127,6 @@ def test_close_releases_client_queue(server_base_url: str) -> None:
 
     conn = pc.authenticate(ClientAuthRequest(name="will-leave"))
     client_id = conn.client_id
-    client_secret = conn.client_secret
     rid = conn.send_request("logoff-test", b"x", content_type="text/plain")
     conn.close()
 
@@ -140,8 +139,6 @@ def test_close_releases_client_queue(server_base_url: str) -> None:
         # Reuse the request_id — but the client's queue is gone now.
         with pytest.raises(PypeClientGoneError):
             req.send_response(b"too late", content_type="text/plain")
-    # Sanity: secrets used so static analyzers don't flag unused.
-    assert client_secret == client_secret
 
 
 def test_get_response_after_close_raises(server_base_url: str) -> None:
@@ -222,8 +219,7 @@ def test_invalid_jwt_raises_auth_error(server_base_url: str) -> None:
     conn = ClientConnection(
         base_url=server_base_url,
         name="x",
-        client_id=999,
-        client_secret="x",
+        client_id="bogus-client-id",
         access_token="not-a-jwt",
         session=bogus_session,
         settings=Settings(base_url=server_base_url, network_buffer_ms=2000),

@@ -18,11 +18,12 @@ class ServiceClaims(TypedDict):
 class ClientClaims(TypedDict):
     role: Literal["client"]
     name: str
-    client_id: int
-    client_secret: str
+    client_id: str
 
 
 def generate_secret() -> str:
+    """Returns a 256-bit URL-safe random string. Used both for `service_secret` and for
+    `client_id` (which doubles as the client's capability)."""
     return secrets.token_urlsafe(32)
 
 
@@ -33,13 +34,8 @@ def issue_service_jwt(name: str, service_secret: str, settings: Settings) -> str
     )
 
 
-def issue_client_jwt(name: str, client_id: int, client_secret: str, settings: Settings) -> str:
-    payload: dict[str, Any] = {
-        "role": "client",
-        "name": name,
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }
+def issue_client_jwt(name: str, client_id: str, settings: Settings) -> str:
+    payload: dict[str, Any] = {"role": "client", "name": name, "client_id": client_id}
     return jwt.encode(
         payload, settings.jwt_secret_key.get_secret_value(), algorithm=settings.jwt_algorithm
     )
@@ -85,15 +81,6 @@ def client_claims(
         raise RoleMismatchError("expected role=client")
     name = claims.get("name")
     client_id = claims.get("client_id")
-    client_secret = claims.get("client_secret")
-    if (
-        not isinstance(name, str)
-        # `bool` is a subclass of `int` in Python, so `isinstance(True, int)` is True.
-        # A JWT carrying `client_id: true` would otherwise pass the int check below;
-        # explicitly rejecting bools keeps id semantics tight.
-        or not isinstance(client_id, int)
-        or isinstance(client_id, bool)
-        or not isinstance(client_secret, str)
-    ):
+    if not isinstance(name, str) or not isinstance(client_id, str) or not client_id:
         raise AuthError("malformed client token")
-    return ClientClaims(role="client", name=name, client_id=client_id, client_secret=client_secret)
+    return ClientClaims(role="client", name=name, client_id=client_id)

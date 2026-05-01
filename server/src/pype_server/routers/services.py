@@ -44,8 +44,8 @@ async def post_request_to_service(
     content_type: Annotated[str | None, Header(alias="Content-Type")] = None,
 ) -> Response:
     entry = registry.get(claims["client_id"])
-    if entry is None or entry.client_secret != claims["client_secret"]:
-        raise ForbiddenError("client not registered or client_secret mismatch")
+    if entry is None:
+        raise ForbiddenError("client not registered")
 
     # POSTing a request proves client liveness. Bump before the (potentially blocking)
     # enqueue so the reaper doesn't evict mid-call, and again after so the next call has
@@ -56,7 +56,6 @@ async def post_request_to_service(
     payload = await request.body()
     pype_req = PypeRequest(
         client_id=claims["client_id"],
-        client_secret=claims["client_secret"],
         request_id=request_id,
         content_type=content_type or settings.default_content_type,
         payload=payload,
@@ -136,8 +135,7 @@ async def get_request_for_service(
         content=item.payload,
         media_type=item.content_type,
         headers={
-            "X-Pype-Client-Id": str(item.client_id),
-            "X-Pype-Client-Secret": item.client_secret,
+            "X-Pype-Client-Id": item.client_id,
             "X-Pype-Request-Id": item.request_id,
         },
     )

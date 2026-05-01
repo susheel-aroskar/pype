@@ -23,9 +23,9 @@ def test_generate_secret_is_unique_and_long_enough() -> None:
 
 def test_issue_client_jwt_round_trip() -> None:
     s = _settings()
-    token = issue_client_jwt("alice", 7, "sec", s)
+    token = issue_client_jwt("alice", "cid-abc", s)
     decoded = jwt.decode(token, s.jwt_secret_key.get_secret_value(), algorithms=[s.jwt_algorithm])
-    assert decoded == {"role": "client", "name": "alice", "client_id": 7, "client_secret": "sec"}
+    assert decoded == {"role": "client", "name": "alice", "client_id": "cid-abc"}
 
 
 def test_issue_service_jwt_round_trip() -> None:
@@ -37,9 +37,9 @@ def test_issue_service_jwt_round_trip() -> None:
 
 def test_client_claims_accepts_valid_client_token() -> None:
     s = _settings()
-    token = issue_client_jwt("alice", 7, "sec", s)
+    token = issue_client_jwt("alice", "cid-abc", s)
     claims = client_claims(s, f"Bearer {token}")
-    assert claims == {"role": "client", "name": "alice", "client_id": 7, "client_secret": "sec"}
+    assert claims == {"role": "client", "name": "alice", "client_id": "cid-abc"}
 
 
 def test_service_claims_accepts_valid_service_token() -> None:
@@ -76,7 +76,7 @@ def test_client_claims_rejects_service_token() -> None:
 
 def test_service_claims_rejects_client_token() -> None:
     s = _settings()
-    token = issue_client_jwt("alice", 1, "sec", s)
+    token = issue_client_jwt("alice", "cid-abc", s)
     with pytest.raises(RoleMismatchError):
         service_claims(s, f"Bearer {token}")
 
@@ -84,8 +84,20 @@ def test_service_claims_rejects_client_token() -> None:
 def test_client_claims_rejects_token_signed_with_wrong_key() -> None:
     s = _settings()
     bad_token = jwt.encode(
-        {"role": "client", "name": "alice", "client_id": 1, "client_secret": "x"},
+        {"role": "client", "name": "alice", "client_id": "cid-abc"},
         "different-secret",
+        algorithm=s.jwt_algorithm,
+    )
+    with pytest.raises(AuthError):
+        client_claims(s, f"Bearer {bad_token}")
+
+
+def test_client_claims_rejects_non_string_client_id() -> None:
+    """Numeric client_ids in tokens should be rejected — client_id is always a string."""
+    s = _settings()
+    bad_token = jwt.encode(
+        {"role": "client", "name": "alice", "client_id": 42},
+        s.jwt_secret_key.get_secret_value(),
         algorithm=s.jwt_algorithm,
     )
     with pytest.raises(AuthError):

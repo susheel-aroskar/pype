@@ -24,8 +24,7 @@ if TYPE_CHECKING:
 class ClientRequest(_PayloadAccessors):
     """A request dequeued by a backend service from `GET /services/{service_name}`."""
 
-    client_id: int
-    client_secret: str
+    client_id: str
     request_id: str
     content_type: str
     payload: bytes
@@ -33,8 +32,7 @@ class ClientRequest(_PayloadAccessors):
 
     def __init__(
         self,
-        client_id: int,
-        client_secret: str,
+        client_id: str,
         request_id: str,
         content_type: str,
         payload: bytes,
@@ -43,7 +41,6 @@ class ClientRequest(_PayloadAccessors):
     ) -> None:
         super().__init__()
         self.client_id = client_id
-        self.client_secret = client_secret
         self.request_id = request_id
         self.content_type = content_type
         self.payload = payload

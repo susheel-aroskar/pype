@@ -39,7 +39,6 @@ def test_get_request_returns_client_request_with_headers() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "42",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "r1",
             "Content-Type": "application/json",
         },
@@ -48,8 +47,7 @@ def test_get_request_returns_client_request_with_headers() -> None:
         ServiceAuthRequest(service_name="billing")
     )
     req = conn.get_request(timeout=0)
-    assert req.client_id == 42
-    assert req.client_secret == "cs"
+    assert req.client_id == "42"
     assert req.request_id == "r1"
     assert req.content_type == "application/json"
     assert req.bytes == b'{"amount": 5}'
@@ -106,7 +104,6 @@ def test_send_response_posts_with_query_params_and_body() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "5",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "rid",
             "Content-Type": "application/json",
         },
@@ -122,7 +119,7 @@ def test_send_response_posts_with_query_params_and_body() -> None:
         c for c in responses.calls if c.request.method == "POST" and "/clients/5" in c.request.url
     )
     assert b"OK" == posted.request.body
-    assert "client_secret=cs" in posted.request.url
+    assert "client_secret" not in posted.request.url  # no separate secret in this design
     assert "request_id=rid" in posted.request.url
     assert "timeout=0" in posted.request.url
     assert posted.request.headers["Content-Type"] == "text/plain"
@@ -137,7 +134,6 @@ def test_send_response_str_payload_is_utf8_encoded() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "1",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "r",
             "Content-Type": "application/json",
         },
@@ -164,7 +160,6 @@ def test_send_response_propagates_410_when_client_gone() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "9",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "r",
             "Content-Type": "application/json",
         },
@@ -187,7 +182,6 @@ def test_send_response_propagates_403() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "1",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "r",
             "Content-Type": "application/json",
         },
@@ -212,7 +206,6 @@ def test_send_response_propagates_503_as_timeout() -> None:
         status=200,
         headers={
             "X-Pype-Client-Id": "1",
-            "X-Pype-Client-Secret": "cs",
             "X-Pype-Request-Id": "r",
             "Content-Type": "application/json",
         },

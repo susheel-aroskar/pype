@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, status
 
 from pype_server.config import Settings, get_settings
 from pype_server.deps import ClientRegistryDep, ServiceRegistryDep
-from pype_server.exceptions import ForbiddenError
 from pype_server.schemas.auth import (
     ClientAuthRequest,
     ClientAuthResponse,
@@ -43,15 +42,12 @@ async def client_auth(
     settings: Annotated[Settings, Depends(get_settings)],
     registry: ClientRegistryDep,
 ) -> ClientAuthResponse:
-    client_secret = generate_secret()
-    entry = registry.register(client_secret)
-    token = issue_client_jwt(body.name, entry.client_id, client_secret, settings)
-    return ClientAuthResponse(
-        access_token=token,
-        name=body.name,
-        client_id=entry.client_id,
-        client_secret=client_secret,
-    )
+    # client_id is itself the capability: a 256-bit random URL-safe string. Knowing it
+    # is what proves authority over the client's queue, so there's no separate secret.
+    client_id = generate_secret()
+    registry.register(client_id)
+    token = issue_client_jwt(body.name, client_id, settings)
+    return ClientAuthResponse(access_token=token, name=body.name, client_id=client_id)
 
 
 @router.delete("/client", response_model=ClientLogoffResponse, status_code=status.HTTP_200_OK)
@@ -59,12 +55,8 @@ async def client_logoff(
     claims: Annotated[ClientClaims, Depends(client_claims)],
     registry: ClientRegistryDep,
 ) -> ClientLogoffResponse:
-    entry = registry.get(claims["client_id"])
-    if entry is None:
-        # Idempotent: if the queue is already gone (reaped or previously deleted), treat
-        # as logged off. The client's goal is achieved either way.
-        return ClientLogoffResponse(client_id=claims["client_id"])
-    if entry.client_secret != claims["client_secret"]:
-        raise ForbiddenError("client_secret mismatch")
+    # Idempotent: if the queue is already gone (reaped or previously deleted), treat as
+    # logged off. The JWT signature alone is sufficient authority to drop our own queue;
+    # the only check needed is that the entry exists at the JWT's client_id.
     registry.remove(claims["client_id"])
     return ClientLogoffResponse(client_id=claims["client_id"])

@@ -26,10 +26,15 @@ class ClientAuthResponse(BaseModel):
     token_type: Literal["Bearer"] = "Bearer"
     role: Literal["client"] = "client"
     name: str
-    client_id: int
-    client_secret: str
+    client_id: str = Field(
+        ...,
+        description=(
+            "Server-generated 256-bit random URL-safe identifier. Doubles as the client's "
+            "capability — knowing the id is what proves authority over this client's queue."
+        ),
+    )
 
 
 class ClientLogoffResponse(BaseModel):
-    client_id: int
+    client_id: str
     status: Literal["logged_off"] = "logged_off"

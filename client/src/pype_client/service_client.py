@@ -112,14 +112,12 @@ class ServiceConnection:
                 f"no requests available for service {self.service_name!r} within timeout"
             )
         try:
-            client_id = int(resp.headers["X-Pype-Client-Id"])
-            client_secret = resp.headers["X-Pype-Client-Secret"]
+            client_id = resp.headers["X-Pype-Client-Id"]
             request_id = resp.headers["X-Pype-Request-Id"]
-        except (KeyError, ValueError) as exc:
-            raise PypeProtocolError(f"missing or malformed X-Pype-* headers: {exc}") from exc
+        except KeyError as exc:
+            raise PypeProtocolError(f"missing X-Pype-* header: {exc}") from exc
         return ClientRequest(
             client_id=client_id,
-            client_secret=client_secret,
             request_id=request_id,
             content_type=resp.headers.get("Content-Type", "application/octet-stream"),
             payload=resp.content,
@@ -137,10 +135,7 @@ class ServiceConnection:
         """Internal: POST /clients/{client_id} on behalf of a `ClientRequest.send_response()`."""
         self._ensure_open()
         body = response.encode("utf-8") if isinstance(response, str) else response
-        params: dict[str, int | str] = {
-            "client_secret": for_request.client_secret,
-            "request_id": for_request.request_id,
-        }
+        params: dict[str, int | str] = {"request_id": for_request.request_id}
         if timeout is not None:
             params["timeout"] = timeout
         resp = call(

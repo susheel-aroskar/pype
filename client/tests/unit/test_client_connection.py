@@ -14,7 +14,7 @@ def _settings() -> Settings:
     return Settings(base_url="http://test.local", network_buffer_ms=100)
 
 
-def _stub_client_auth(client_id: int = 1) -> None:
+def _stub_client_auth(client_id: str = "cid-1") -> None:
     responses.post(
         "http://test.local/auth/client",
         json={
@@ -23,13 +23,12 @@ def _stub_client_auth(client_id: int = 1) -> None:
             "role": "client",
             "name": "alice",
             "client_id": client_id,
-            "client_secret": "cs",
         },
         status=200,
     )
 
 
-def _auth_conn(client_id: int = 1):  # type: ignore[no-untyped-def]
+def _auth_conn(client_id: str = "cid-1"):  # type: ignore[no-untyped-def]
     _stub_client_auth(client_id)
     return PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="alice"))
 
@@ -77,7 +76,7 @@ def test_send_request_400_raises_bad_request() -> None:
         conn.send_request("svc", b"x")
 
 
-def _stub_response(client_id: int, request_id: str, body: bytes, content_type: str) -> None:
+def _stub_response(client_id: str, request_id: str, body: bytes, content_type: str) -> None:
     responses.add(
         responses.GET,
         f"http://test.local/clients/{client_id}",
@@ -90,7 +89,7 @@ def _stub_response(client_id: int, request_id: str, body: bytes, content_type: s
 @responses.activate
 def test_get_response_happy_path() -> None:
     _stub_client_auth()
-    _stub_response(1, "myreq", b'{"answer":42}', "application/json")
+    _stub_response("cid-1", "myreq", b'{"answer":42}', "application/json")
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     resp = conn.get_response("myreq", timeout=1000)
     assert resp.request_id == "myreq"
@@ -101,7 +100,7 @@ def test_get_response_happy_path() -> None:
 @responses.activate
 def test_get_response_preserves_arbitrary_content_type() -> None:
     _stub_client_auth()
-    _stub_response(1, "rid", b"<root/>", "application/xml; charset=utf-8")
+    _stub_response("cid-1", "rid", b"<root/>", "application/xml; charset=utf-8")
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     resp = conn.get_response("rid", timeout=1000)
     assert resp.content_type == "application/xml; charset=utf-8"
@@ -112,8 +111,8 @@ def test_get_response_preserves_arbitrary_content_type() -> None:
 def test_get_response_caches_other_request_ids() -> None:
     _stub_client_auth()
     # First GET returns "other", second returns "mine".
-    _stub_response(1, "other", b"OTHER", "text/plain")
-    _stub_response(1, "mine", b"MINE", "text/plain")
+    _stub_response("cid-1", "other", b"OTHER", "text/plain")
+    _stub_response("cid-1", "mine", b"MINE", "text/plain")
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     resp = conn.get_response("mine", timeout=1000)
     assert resp.bytes == b"MINE"
@@ -141,7 +140,7 @@ def test_get_response_returns_cached_without_http_call() -> None:
 @responses.activate
 def test_get_response_raises_timeout_on_204() -> None:
     _stub_client_auth()
-    responses.get("http://test.local/clients/1", status=204)
+    responses.get("http://test.local/clients/cid-1", status=204)
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     with pytest.raises(PypeTimeoutError):
         conn.get_response("missing", timeout=100)
@@ -151,7 +150,7 @@ def test_get_response_raises_timeout_on_204() -> None:
 def test_get_response_propagates_403() -> None:
     _stub_client_auth()
     responses.get(
-        "http://test.local/clients/1", json={"detail": "no", "code": "FORBIDDEN"}, status=403
+        "http://test.local/clients/cid-1", json={"detail": "no", "code": "FORBIDDEN"}, status=403
     )
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     with pytest.raises(PypeForbiddenError):
@@ -178,8 +177,8 @@ def test_get_any_responses_returns_all_currently_matching() -> None:
 def test_get_all_responses_blocks_until_all_present() -> None:
     _stub_client_auth()
     # Server delivers them in order: r2, r1.
-    _stub_response(1, "r2", b"two", "text/plain")
-    _stub_response(1, "r1", b"one", "text/plain")
+    _stub_response("cid-1", "r2", b"two", "text/plain")
+    _stub_response("cid-1", "r1", b"one", "text/plain")
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     out = conn.get_all_responses("r1", "r2", timeout=2000)
     assert set(out.keys()) == {"r1", "r2"}
@@ -190,8 +189,8 @@ def test_get_all_responses_blocks_until_all_present() -> None:
 @responses.activate
 def test_get_all_responses_partial_left_in_cache_on_timeout() -> None:
     _stub_client_auth()
-    _stub_response(1, "r1", b"one", "text/plain")  # only one delivered
-    responses.get("http://test.local/clients/1", status=204)  # then 204s
+    _stub_response("cid-1", "r1", b"one", "text/plain")  # only one delivered
+    responses.get("http://test.local/clients/cid-1", status=204)  # then 204s
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     with pytest.raises(PypeTimeoutError):
         conn.get_all_responses("r1", "r2", timeout=100)
@@ -202,8 +201,8 @@ def test_get_all_responses_partial_left_in_cache_on_timeout() -> None:
 @responses.activate
 def test_get_response_quorum_returns_when_threshold_reached() -> None:
     _stub_client_auth()
-    _stub_response(1, "r1", b"1", "text/plain")
-    _stub_response(1, "r2", b"2", "text/plain")
+    _stub_response("cid-1", "r1", b"1", "text/plain")
+    _stub_response("cid-1", "r2", b"2", "text/plain")
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     out = conn.get_response_quorum(2, "r1", "r2", "r3", timeout=2000)
     assert {"r1", "r2"}.issubset(out.keys())
@@ -311,10 +310,10 @@ def test_call_falls_back_to_get_response_on_202() -> None:
     _stub_client_auth()
     # Phase 1: server returns 202 (request enqueued, nothing in client queue yet).
     responses.post("http://test.local/services/echo", status=202, body=b"")
-    # Phase 2: GET /clients/1 returns the response for our request_id.
+    # Phase 2: GET /clients/cid-1 returns the response for our request_id.
     responses.add(
         responses.GET,
-        "http://test.local/clients/1",
+        "http://test.local/clients/cid-1",
         body=b"late",
         status=200,
         headers={"X-Pype-Request-Id": "1", "Content-Type": "text/plain"},
@@ -340,7 +339,7 @@ def test_call_caches_mismatched_response_and_falls_back() -> None:
     # Phase 2: GET delivers OUR response.
     responses.add(
         responses.GET,
-        "http://test.local/clients/1",
+        "http://test.local/clients/cid-1",
         body=b"OURS",
         status=200,
         headers={"X-Pype-Request-Id": "1", "Content-Type": "text/plain"},
@@ -377,7 +376,7 @@ def test_call_raises_timeout_when_fallback_also_exhausts_deadline() -> None:
     With finite timeout, call() should raise PypeTimeoutError."""
     _stub_client_auth()
     responses.post("http://test.local/services/echo", status=202, body=b"")
-    responses.get("http://test.local/clients/1", status=204)
+    responses.get("http://test.local/clients/cid-1", status=204)
     conn = PypeClient(settings=_settings()).authenticate(ClientAuthRequest(name="x"))
     with pytest.raises(PypeTimeoutError):
         conn.call("echo", b"x", timeout=100)

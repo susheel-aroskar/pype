@@ -70,15 +70,13 @@ def test_pype_client_authenticate_returns_connection() -> None:
             "token_type": "Bearer",
             "role": "client",
             "name": "alice",
-            "client_id": 7,
-            "client_secret": "cs",
+            "client_id": "cid-abc",
         },
         status=200,
     )
     pc = PypeClient(settings=_settings())
     conn = pc.authenticate(ClientAuthRequest(name="alice"))
-    assert conn.client_id == 7
-    assert conn.client_secret == "cs"
+    assert conn.client_id == "cid-abc"
     assert conn.name == "alice"
 
 

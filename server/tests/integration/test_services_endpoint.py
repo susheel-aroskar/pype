@@ -66,8 +66,8 @@ async def test_post_then_get_roundtrips_payload_and_headers(client: AsyncClient)
     assert r.status_code == 200
     assert r.content == payload
     assert r.headers["content-type"].startswith("application/json")
-    assert r.headers["x-pype-client-id"] == str(cl["client_id"])
-    assert r.headers["x-pype-client-secret"] == cl["client_secret"]
+    assert r.headers["x-pype-client-id"] == cl["client_id"]
+    assert "x-pype-client-secret" not in r.headers
     assert r.headers["x-pype-request-id"] == "req-42"
 
 
@@ -196,10 +196,9 @@ async def test_block_mode_returns_200_with_response_when_service_responds(
         )
         assert r.status_code == 200
         client_id = r.headers["x-pype-client-id"]
-        client_secret = r.headers["x-pype-client-secret"]
         request_id = r.headers["x-pype-request-id"]
         await client.post(
-            f"/clients/{client_id}?client_secret={client_secret}&request_id={request_id}",
+            f"/clients/{client_id}?request_id={request_id}",
             headers={
                 **auth_header(str(svc["access_token"])),
                 "Content-Type": "text/plain",
@@ -274,7 +273,7 @@ async def test_block_mode_returns_200_with_mismatched_request_id_when_stale_resp
     )
     await client.post(
         f"/clients/{cl['client_id']}"
-        f"?client_secret={cl['client_secret']}&request_id={drained.headers['x-pype-request-id']}",
+        f"?request_id={drained.headers['x-pype-request-id']}",
         headers={**auth_header(str(svc["access_token"])), "Content-Type": "text/plain"},
         content=b"FIRST_RESPONSE",
     )

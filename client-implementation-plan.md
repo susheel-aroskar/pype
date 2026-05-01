@@ -36,8 +36,7 @@ Returned by successful `ServiceClient.authenticate()`, wraps a valid JWT token s
 
 ## ClientRequest
 Wraps a client request pulled from (GET)  `/services/{service_name}` endpoint using `service_client.get_request()`. Fields:
-- `client_id`: int (from the `X-Pype-Client-Id` response HTTP header)
-- `client_secret`: string (from the `X-Pype-Client-Secret` response HTTP header)
+- `client_id`: string (from the `X-Pype-Client-Id` response HTTP header). The `client_id` is a 256-bit URL-safe random string and acts as the capability for posting back to that client's queue.
 - `request_id`: string (from the `X-Pype-Request-Id` response HTTP header)
 - `content_type`: string (from the standard `Content-Type` response HTTP header)
 - `request_body`: bytes (raw response body of the GET — preserves whatever the original client sent)
@@ -56,7 +55,6 @@ It exposes the method `send_response()`. The service is responsible for picking 
 - If `response` is `str`, the library encodes it as UTF-8 bytes before sending.
 - POST contains
     - client_id in the path parameter
-    - client_secret as a query parameter
     - request_id as a query parameter
     - timeout as a query parameter
     - `Content-Type` HTTP request header set to `content_type`
@@ -83,17 +81,17 @@ Takes host and port of the pype server in its __init__() method, if not specifie
 ```
 - It submits the `ClientAuthRequest` to the `/auth/client` endpoint of pype server.
 - Successful auth returns `ClientConnection` object, otherwise throws an application-specific exception with a good, intuitive error message.
-- The auth response is `Content-Type: application/json` with shape `{ "access_token", "token_type", "role", "name", "client_id", "client_secret" }`. The library reads `access_token`, `client_id`, and `client_secret` directly from this JSON for the connection's own use; no JWT decoding is needed on the client side.
+- The auth response is `Content-Type: application/json` with shape `{ "access_token", "token_type", "role", "name", "client_id" }`. The library reads `access_token` and `client_id` directly from this JSON for the connection's own use; no JWT decoding is needed on the client side. The `client_id` is a 256-bit URL-safe random string that doubles as the capability — there is no separate `client_secret` field.
 - On successful authentication, the returned `ClientConnection` object wraps the JWT and submits it as an `Authorization: Bearer ...` HTTP header on every subsequent request.
 
 ## ClientConnection
-Returned by successful `PypeClient.authenticate()`, wraps a valid JWT token signed by the pype server + its own `client_name` and server generated client_id and client_secret. It exposes following methods:
+Returned by successful `PypeClient.authenticate()`, wraps a valid JWT token signed by the pype server + its own `client_name` and the server-generated `client_id`. It exposes following methods:
 
 ### ClientConnection.log_off():
 Does a DELETE request `/auth/client` endpoint of pype server with its JWT token to sign off.
 
 ### ClientConnection.send_request(service_name: str, request: str | bytes, content_type: str = "application/json", timeout = None) -> str:
-- Does POST to `/services/{service_name}` providing it's own `client_id` and `client_secret` in a JWT token and a unique `request_id` as a query parameter internally. Request body is the request to be sent to the backend service.
+- Does POST to `/services/{service_name}` providing it's own `client_id` in a JWT token (carried as `Authorization: Bearer ...`) and a unique `request_id` as a query parameter internally. Request body is the request to be sent to the backend service.
 - If `request` is `str`, the library encodes it as UTF-8 bytes before sending. The `Content-Type` HTTP request header is set to `content_type`.
 - `request_id`s must be unique for every request for a given client. They are generated internally simply by incrementing a single int counter cached inside `ClientConnection` instance and then converting the incremented value to string.
 - Returns the `request_id` generated and used for sending the request. It can be used as a "request handle" later to retrieve the response generated for this request using the same `ClientConnection` instance. Throws an appropriate application exception / timeout exception depending on the status code if the status code is not `202 Accepted` — for example, 400, 401, 403, or 503 (timeout).

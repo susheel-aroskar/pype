@@ -28,20 +28,20 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 )
 async def post_response_to_client(
     request: Request,
-    client_id: Annotated[int, Path()],
+    client_id: Annotated[str, Path(min_length=1)],
     claims: Annotated[ServiceClaims, Depends(service_claims)],
     registry: ClientRegistryDep,
     settings: Annotated[Settings, Depends(get_settings)],
-    client_secret: Annotated[str, Query(min_length=1)],
     request_id: Annotated[str, Query(min_length=1)],
     timeout: Annotated[int | None, Query()] = None,
     content_type: Annotated[str | None, Header(alias="Content-Type")] = None,
 ) -> Response:
+    # client_id is unguessable (256-bit random), so its mere presence in the registry
+    # is the capability check: a service that didn't legitimately pull this client's
+    # request can't know the id and therefore can't post here.
     entry = registry.get(client_id)
     if entry is None:
         raise ClientQueueGoneError(f"no client queue for client_id={client_id}")
-    if entry.client_secret != client_secret:
-        raise ForbiddenError("client_secret mismatch")
 
     timeout_ms = normalize_timeout(timeout, settings.max_timeout_ms)
     payload = await request.body()
@@ -66,7 +66,7 @@ async def post_response_to_client(
     },
 )
 async def get_response_for_client(
-    client_id: Annotated[int, Path()],
+    client_id: Annotated[str, Path(min_length=1)],
     claims: Annotated[ClientClaims, Depends(client_claims)],
     registry: ClientRegistryDep,
     settings: Annotated[Settings, Depends(get_settings)],
@@ -77,8 +77,6 @@ async def get_response_for_client(
     entry = registry.get(client_id)
     if entry is None:
         raise ClientQueueNotFoundError(f"no client registered for client_id={client_id}")
-    if entry.client_secret != claims["client_secret"]:
-        raise ForbiddenError("client_secret mismatch")
 
     # GET proves liveness regardless of whether a response is dequeued.
     registry.bump_last_seen(client_id)

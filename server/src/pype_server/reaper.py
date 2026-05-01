@@ -28,7 +28,7 @@ class ClientQueueReaper:
         self._period_seconds = period_seconds
         self._batch_size = batch_size
         self._threshold_seconds = inactivity_threshold_seconds
-        self._cursor: list[int] = []
+        self._cursor: list[str] = []
         self._cursor_idx = 0
 
     def _tick(self) -> int:
