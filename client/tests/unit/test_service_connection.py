@@ -27,6 +27,7 @@ def _stub_service_auth() -> None:
             "service_secret": "s",
         },
         status=200,
+        headers={"X-Pype-Server-IP": "10.42.0.1"},
     )
 
 
@@ -237,3 +238,32 @@ def test_context_manager_closes_on_exit() -> None:
     with sc.authenticate(ServiceAuthRequest(service_name="billing")) as conn:
         assert conn._closed is False
     assert conn._closed is True
+
+
+@responses.activate
+def test_subsequent_get_request_carries_server_ip_header() -> None:
+    """The whole point of capturing X-Pype-Server-IP from auth: it should ride
+    on every subsequent request through the same connection so a future LB can
+    route stickily."""
+    _stub_service_auth()  # Auth response carries X-Pype-Server-IP: 10.42.0.1
+    responses.get(
+        "http://test.local/services/billing",
+        body=b"{}",
+        status=200,
+        headers={
+            "X-Pype-Client-Id": "cid",
+            "X-Pype-Request-Id": "r",
+            "Content-Type": "application/json",
+        },
+    )
+    conn = ServiceClient(settings=_settings()).authenticate(
+        ServiceAuthRequest(service_name="billing")
+    )
+    conn.get_request(timeout=0)
+
+    fetched = next(
+        c
+        for c in responses.calls
+        if c.request.method == "GET" and "/services/billing" in c.request.url
+    )
+    assert fetched.request.headers.get("X-Pype-Server-IP") == "10.42.0.1"

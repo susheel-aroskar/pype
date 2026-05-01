@@ -14,6 +14,9 @@ async def test_client_auth_returns_jwt_and_claims(client: AsyncClient) -> None:
     assert isinstance(body["client_id"], str) and len(body["client_id"]) >= 32
     assert "client_secret" not in body  # no separate secret in this design
     assert isinstance(body["access_token"], str) and body["access_token"]
+    # Server identifies itself for sticky-routing purposes; tests pin internal_ip to
+    # 10.42.0.1 in conftest.
+    assert r.headers["X-Pype-Server-IP"] == "10.42.0.1"
 
 
 async def test_client_ids_are_unique(client: AsyncClient) -> None:

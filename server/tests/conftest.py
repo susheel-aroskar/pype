@@ -17,6 +17,9 @@ def make_test_settings(**overrides: object) -> Settings:
         "client_reaper_period_seconds": 3600.0,
         "client_reaper_batch_size": 1000,
         "client_inactivity_threshold_seconds": 3600.0,
+        # Pin internal_ip so tests don't make real DNS / socket calls and so assertions
+        # against the X-Pype-Server-IP header have a deterministic value to compare.
+        "internal_ip": "10.42.0.1",
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

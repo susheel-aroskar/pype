@@ -84,3 +84,73 @@ def test_service_auth_request_rejects_empty_service_name() -> None:
     # The service_name validation lives on the schema now, not on ServiceClient.__init__.
     with pytest.raises(ValidationError):
         ServiceAuthRequest(service_name="")
+
+
+# ----------------------------------------------------------------------------
+# X-Pype-Server-IP plumbing
+# ----------------------------------------------------------------------------
+
+
+@responses.activate
+def test_service_authenticate_captures_server_ip_header() -> None:
+    """ServiceClient.authenticate should pull the X-Pype-Server-IP header off the auth
+    response, expose it on the connection, and add it to session.headers so every
+    subsequent request automatically carries it."""
+    responses.post(
+        "http://test.local/auth/service",
+        json={
+            "access_token": "jwt",
+            "token_type": "Bearer",
+            "role": "service",
+            "name": "billing",
+            "service_secret": "s",
+        },
+        status=200,
+        headers={"X-Pype-Server-IP": "10.99.0.7"},
+    )
+    sc = ServiceClient(settings=_settings())
+    conn = sc.authenticate(ServiceAuthRequest(service_name="billing"))
+    assert conn.server_internal_ip == "10.99.0.7"
+    assert conn._session.headers["X-Pype-Server-IP"] == "10.99.0.7"
+
+
+@responses.activate
+def test_pype_client_authenticate_captures_server_ip_header() -> None:
+    responses.post(
+        "http://test.local/auth/client",
+        json={
+            "access_token": "jwt",
+            "token_type": "Bearer",
+            "role": "client",
+            "name": "alice",
+            "client_id": "cid-xyz",
+        },
+        status=200,
+        headers={"X-Pype-Server-IP": "192.168.5.10"},
+    )
+    pc = PypeClient(settings=_settings())
+    conn = pc.authenticate(ClientAuthRequest(name="alice"))
+    assert conn.server_internal_ip == "192.168.5.10"
+    assert conn._session.headers["X-Pype-Server-IP"] == "192.168.5.10"
+
+
+@responses.activate
+def test_pype_client_authenticate_tolerates_missing_server_ip_header() -> None:
+    """If the server doesn't send the header (e.g., older deployment), the client
+    should authenticate successfully and just not set the header on subsequent
+    requests. server_internal_ip is None in that case."""
+    responses.post(
+        "http://test.local/auth/client",
+        json={
+            "access_token": "jwt",
+            "token_type": "Bearer",
+            "role": "client",
+            "name": "alice",
+            "client_id": "cid-xyz",
+        },
+        status=200,
+    )
+    pc = PypeClient(settings=_settings())
+    conn = pc.authenticate(ClientAuthRequest(name="alice"))
+    assert conn.server_internal_ip is None
+    assert "X-Pype-Server-IP" not in conn._session.headers

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from pype_server.config import Settings, get_settings
 from pype_server.deps import ClientRegistryDep, ServiceRegistryDep
@@ -21,16 +21,23 @@ from pype_server.security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Both auth handlers stamp this header onto their responses so callers know which
+# pype instance they authenticated against. Clients then echo it back on every
+# subsequent request — see the X-Pype-Server-IP discussion in the design doc.
+_SERVER_IP_HEADER = "X-Pype-Server-IP"
+
 
 @router.post("/service", response_model=ServiceAuthResponse, status_code=status.HTTP_200_OK)
 async def service_auth(
     body: ServiceAuthRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     service_registry: ServiceRegistryDep,
+    response: Response,
 ) -> ServiceAuthResponse:
     service_secret = generate_secret()
     token = issue_service_jwt(body.service_name, service_secret, settings)
     service_registry.get_or_create(body.service_name)
+    response.headers[_SERVER_IP_HEADER] = settings.internal_ip
     return ServiceAuthResponse(
         access_token=token, name=body.service_name, service_secret=service_secret
     )
@@ -41,12 +48,14 @@ async def client_auth(
     body: ClientAuthRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     registry: ClientRegistryDep,
+    response: Response,
 ) -> ClientAuthResponse:
     # client_id is itself the capability: a 256-bit random URL-safe string. Knowing it
     # is what proves authority over the client's queue, so there's no separate secret.
     client_id = generate_secret()
     registry.register(client_id)
     token = issue_client_jwt(body.name, client_id, settings)
+    response.headers[_SERVER_IP_HEADER] = settings.internal_ip
     return ClientAuthResponse(access_token=token, name=body.name, client_id=client_id)
 
 

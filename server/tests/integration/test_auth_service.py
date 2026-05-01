@@ -10,6 +10,7 @@ async def test_service_auth_returns_jwt_and_claim_fields(client: AsyncClient) ->
     assert body["name"] == "billing"
     assert isinstance(body["access_token"], str) and body["access_token"]
     assert isinstance(body["service_secret"], str) and len(body["service_secret"]) >= 32
+    assert r.headers["X-Pype-Server-IP"] == "10.42.0.1"
 
 
 async def test_service_auth_registers_queue_lazily(client: AsyncClient) -> None:

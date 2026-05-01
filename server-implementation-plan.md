@@ -23,6 +23,12 @@ We are going to build both the pype server and a pype client to achieve this. Le
     - On `POST /services/{service_name}`, the inbound `Content-Type` is captured into `PypeRequest.content_type` along with the payload bytes, and returned as the `Content-Type` HTTP response header on the corresponding `GET /services/{service_name}`.
     - Same flow on the response side: `POST /clients/{client_id}` captures `Content-Type` into `PypeResponse.content_type`, and `GET /clients/{client_id}` returns it as the `Content-Type` HTTP response header.
 
+# Sticky-routing support: the X-Pype-Server-IP header
+- On every successful auth (`POST /auth/service` and `POST /auth/client`), the server sets a `X-Pype-Server-IP` HTTP response header carrying its own RFC 1918 private IPv4 address (10.x.x.x, 172.16-31.x.x, or 192.168.x.x). If no qualifying private address is detectable, the value is `127.0.0.1`.
+- The IP is auto-detected at server startup and cached for the process lifetime; it can be overridden via the `PYPE_SERVER_INTERNAL_IP` env var or the `internal_ip` setting.
+- Clients (both pype-client `ServiceConnection` and `ClientConnection`) capture this header and echo it back as `X-Pype-Server-IP` on every subsequent request.
+- The server itself does not currently validate or act on the inbound header — it exists purely to enable a future reverse proxy / load balancer in front of pype to do **sticky routing**: send a given client's traffic back to the exact pype instance that holds that client's queue in memory. Without stickiness, a multi-instance pype deployment would split a client's session across nodes and fail (the client's queue is on instance A but the response goes to instance B's empty registry).
+
 # REST endpoint /auth/service: 
 ## POST:
 - Service instances POST to this endpoint with their credentials to authenticate themselves. For this prototype, we will assume any {service_name} is a valid credential. The authentication will always succeed.

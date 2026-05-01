@@ -60,10 +60,18 @@ class ServiceClient:
             raise PypeProtocolError(f"malformed auth response: {data!r}") from exc
 
         session.headers["Authorization"] = f"Bearer {access_token}"
+        # Echo the server's identifying IP on every subsequent request through this
+        # session, so a future LB / reverse proxy in front of pype can route stickily
+        # back to the same instance (which holds the relevant queues in memory).
+        # Best-effort: if the header is missing, we just don't set it.
+        server_internal_ip = resp.headers.get("X-Pype-Server-IP")
+        if server_internal_ip:
+            session.headers["X-Pype-Server-IP"] = server_internal_ip
         return ServiceConnection(
             base_url=self._base_url,
             service_name=name,
             access_token=access_token,
+            server_internal_ip=server_internal_ip,
             session=session,
             settings=self._settings,
         )
@@ -79,10 +87,12 @@ class ServiceConnection:
         access_token: str,
         session: requests.Session,
         settings: Settings,
+        server_internal_ip: str | None = None,
     ) -> None:
         self._base_url = base_url
         self.service_name = service_name
         self.access_token = access_token
+        self.server_internal_ip = server_internal_ip
         self._session = session
         self._settings = settings
         self._closed = False

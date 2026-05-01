@@ -43,6 +43,14 @@ class ClientRegistry:
         self._entries: dict[str, ClientEntry] = {}
 
     def register(self, client_id: str) -> ClientEntry:
+        """Register a new client and return its entry.
+
+        The caller is responsible for supplying a `client_id` that is not already in the
+        registry. In this codebase the only caller is `POST /auth/client`, which uses
+        `secrets.token_urlsafe(32)` — 256 bits of entropy. Collisions among live clients
+        are cryptographically unreachable (~2^-196 even at one billion concurrent clients),
+        so we do not check.
+        """
         queue: asyncio.Queue[PypeResponse] = asyncio.Queue(maxsize=self._queue_max_size)
         entry = ClientEntry(client_id=client_id, queue=queue)
         self._entries[client_id] = entry
