@@ -123,7 +123,7 @@ lookup on `POST /services/{name}`. Sub-microsecond, no extra service to call.
 The same mechanism extends naturally to per-service rate limits, per-tenant
 quotas, and audit logging.
 
-## What's in this submission
+## What's in this drop
 
 - `pype-server`: an async FastAPI app implementing the protocol described
   above. Includes a background reaper for abandoned client queues, end-to-end
