@@ -745,6 +745,9 @@ def log_service(prefix: str, color: str, message: str) -> None:
 
 
 def banner(message: str) -> None:
+    # No explicit foreground color: bold-only renders in the terminal's default text
+    # color, which stays high-contrast on both light and dark backgrounds. (Picking
+    # a saturated color would also visually clash with the actor colors below.)
     with _PRINT_LOCK:
-        print(f"\n{Ansi.BOLD}{Ansi.BRIGHT_WHITE}{'═' * 78}\n  {message}\n{'═' * 78}{Ansi.RESET}")
+        print(f"\n{Ansi.BOLD}{'═' * 78}\n  {message}\n{'═' * 78}{Ansi.RESET}")
 
