@@ -2,7 +2,6 @@ import pytest
 import responses
 from pype_client import (
     PypeBadRequestError,
-    PypeClientGoneError,
     PypeForbiddenError,
     PypeProtocolError,
     PypeTimeoutError,
@@ -150,28 +149,6 @@ def test_send_response_str_payload_is_utf8_encoded() -> None:
         c for c in responses.calls if c.request.method == "POST" and "/clients/" in c.request.url
     )
     assert posted.request.body == "héllo".encode()
-
-
-@responses.activate
-def test_send_response_propagates_410_when_client_gone() -> None:
-    _stub_service_auth()
-    responses.get(
-        "http://test.local/services/billing",
-        body=b"{}",
-        status=200,
-        headers={
-            "X-Pype-Client-Id": "9",
-            "X-Pype-Request-Id": "r",
-            "Content-Type": "application/json",
-        },
-    )
-    responses.post("http://test.local/clients/9", json={"detail": "gone", "code": "X"}, status=410)
-    conn = ServiceClient(settings=_settings()).authenticate(
-        ServiceAuthRequest(service_name="billing")
-    )
-    req = conn.get_request(timeout=0)
-    with pytest.raises(PypeClientGoneError):
-        req.send_response(b"x")
 
 
 @responses.activate

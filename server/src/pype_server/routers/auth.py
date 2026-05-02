@@ -47,13 +47,15 @@ async def service_auth(
 async def client_auth(
     body: ClientAuthRequest,
     settings: Annotated[Settings, Depends(get_settings)],
-    registry: ClientRegistryDep,
     response: Response,
 ) -> ClientAuthResponse:
-    # client_id is itself the capability: a 256-bit random URL-safe string. Knowing it
-    # is what proves authority over the client's queue, so there's no separate secret.
+    # `client_id` is the capability: a 256-bit random URL-safe string. Knowing it (and
+    # holding a server-signed JWT for it) is what proves authority over the queue.
+    # We do NOT pre-register an entry here — entries are lazy-created on first use of
+    # /clients/{id} (by either a service POSTing a response or the client GETting one).
+    # Lazy creation lets a client's JWT seamlessly land on any pype instance behind a
+    # load balancer.
     client_id = generate_secret()
-    registry.register(client_id)
     token = issue_client_jwt(body.name, client_id, settings)
     response.headers[_SERVER_IP_HEADER] = settings.internal_ip
     return ClientAuthResponse(access_token=token, name=body.name, client_id=client_id)

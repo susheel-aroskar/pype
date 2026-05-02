@@ -4,11 +4,7 @@ from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, 
 
 from pype_server.config import Settings, get_settings
 from pype_server.deps import ClientRegistryDep
-from pype_server.exceptions import (
-    ClientQueueGoneError,
-    ClientQueueNotFoundError,
-    ForbiddenError,
-)
+from pype_server.exceptions import ForbiddenError
 from pype_server.messaging import PypeResponse
 from pype_server.queueing import normalize_timeout, queue_get, queue_put
 from pype_server.security import ClientClaims, ServiceClaims, client_claims, service_claims
@@ -22,7 +18,6 @@ router = APIRouter(prefix="/clients", tags=["clients"])
     response_class=Response,
     responses={
         202: {"description": "Service response enqueued"},
-        410: {"description": "Client no longer exists"},
         503: {"description": "Client queue full; timed out before space was available"},
     },
 )
@@ -36,12 +31,13 @@ async def post_response_to_client(
     timeout: Annotated[int | None, Query()] = None,
     content_type: Annotated[str | None, Header(alias="Content-Type")] = None,
 ) -> Response:
-    # client_id is unguessable (256-bit random), so its mere presence in the registry
-    # is the capability check: a service that didn't legitimately pull this client's
-    # request can't know the id and therefore can't post here.
-    entry = registry.get(client_id)
-    if entry is None:
-        raise ClientQueueGoneError(f"no client queue for client_id={client_id}")
+    # `client_id` is unguessable (256-bit random) and the service token's signature is
+    # validated by the dependency above, so authority is established. The entry itself
+    # is lazy-created — if this is the first time anyone has touched this client_id on
+    # this pype instance (e.g., the client first authenticated against a different
+    # instance and bounced over here), we just create a fresh queue. The reaper will
+    # clean it up later if the client never comes back to drain it.
+    entry = registry.get_or_create(client_id)
 
     timeout_ms = normalize_timeout(timeout, settings.max_timeout_ms)
     payload = await request.body()
@@ -62,7 +58,6 @@ async def post_response_to_client(
     responses={
         200: {"description": "Service response dequeued"},
         204: {"description": "Client queue empty; timed out"},
-        400: {"description": "Client does not exist"},
     },
 )
 async def get_response_for_client(
@@ -74,9 +69,11 @@ async def get_response_for_client(
 ) -> Response:
     if claims["client_id"] != client_id:
         raise ForbiddenError("path client_id does not match token's client_id")
-    entry = registry.get(client_id)
-    if entry is None:
-        raise ClientQueueNotFoundError(f"no client registered for client_id={client_id}")
+    # Lazy-create: if this client just authenticated and is polling before any service
+    # has POSTed a response (or the client landed here from another pype instance), we
+    # still need an empty queue to long-poll on. JWT signature is the sole authority;
+    # entry presence is just bookkeeping.
+    entry = registry.get_or_create(client_id)
 
     # GET proves liveness regardless of whether a response is dequeued.
     registry.bump_last_seen(client_id)

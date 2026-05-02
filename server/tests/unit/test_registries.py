@@ -20,26 +20,35 @@ def test_service_registry_snapshot_loads_reflects_qsize() -> None:
     assert ("svc", 2) in r.snapshot_loads()
 
 
-def test_client_registry_register_keys_by_caller_supplied_id() -> None:
+def test_client_registry_get_or_create_keys_by_caller_supplied_id() -> None:
     cr = ClientRegistry(queue_max_size=2)
-    a = cr.register("client-id-a")
-    b = cr.register("client-id-b")
+    a = cr.get_or_create("client-id-a")
+    b = cr.get_or_create("client-id-b")
     assert a.client_id == "client-id-a"
     assert b.client_id == "client-id-b"
     assert cr.get("client-id-a") is a
     assert cr.get("client-id-b") is b
 
 
+def test_client_registry_get_or_create_is_idempotent() -> None:
+    """Two calls with the same id return the same entry — that's the lazy-create
+    invariant the routers rely on."""
+    cr = ClientRegistry(queue_max_size=2)
+    first = cr.get_or_create("cid")
+    second = cr.get_or_create("cid")
+    assert first is second
+
+
 def test_client_registry_get_returns_entry() -> None:
     cr = ClientRegistry(queue_max_size=2)
-    a = cr.register("cid")
+    a = cr.get_or_create("cid")
     fetched = cr.get("cid")
     assert fetched is a
 
 
 def test_client_registry_remove_returns_and_clears() -> None:
     cr = ClientRegistry(queue_max_size=2)
-    a = cr.register("cid")
+    a = cr.get_or_create("cid")
     assert cr.remove("cid") is a
     assert cr.get("cid") is None
     assert cr.remove("cid") is None
@@ -47,7 +56,7 @@ def test_client_registry_remove_returns_and_clears() -> None:
 
 async def test_client_registry_bump_last_seen_updates() -> None:
     cr = ClientRegistry(queue_max_size=2)
-    a = cr.register("cid")
+    a = cr.get_or_create("cid")
     before = a.last_seen
     await asyncio.sleep(0.001)
     cr.bump_last_seen("cid")
@@ -61,7 +70,7 @@ def test_client_registry_bump_last_seen_missing_is_noop() -> None:
 
 def test_client_registry_snapshot_keys_independent_of_dict() -> None:
     cr = ClientRegistry(queue_max_size=2)
-    cr.register("cid-a")
+    cr.get_or_create("cid-a")
     keys = cr.snapshot_keys()
     cr.remove("cid-a")  # mutate after snapshot
     assert "cid-a" in keys  # snapshot is independent

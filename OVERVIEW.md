@@ -73,7 +73,7 @@ burst doesn't knock backends over; it temporarily raises queue depth, Pype
 pushes back via 503 once the cap is hit, and the autoscaler reacts.
 
 **Time-decoupled startup.** Clients and services don't need to coordinate 
-their start-up order. A client may POST to a service that hasn't starte yet.
+their start-up order. A client may POST to a service that hasn't started yet.
 Pype creates the queue on the fly, and the request waits patiently. There's no
 "wait for upstream to be healthy first" coordination.
 

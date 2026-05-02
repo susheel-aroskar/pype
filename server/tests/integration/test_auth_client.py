@@ -30,11 +30,13 @@ async def test_client_logoff_succeeds(client: AsyncClient) -> None:
     r = await client.delete("/auth/client", headers=auth_header(auth["access_token"]))
     assert r.status_code == 200
     assert r.json() == {"client_id": auth["client_id"], "status": "logged_off"}
-    # After logoff the queue should be gone — GET should now return 400.
+    # In the lazy-create model, a GET after logoff just creates a fresh empty queue
+    # and 204s on timeout — there's no "this client is gone" status. The JWT signature
+    # is the sole authority, and the JWT is still valid until it expires.
     r2 = await client.get(
         f"/clients/{auth['client_id']}?timeout=0", headers=auth_header(auth["access_token"])
     )
-    assert r2.status_code == 400
+    assert r2.status_code == 204
 
 
 async def test_client_logoff_idempotent(client: AsyncClient) -> None:

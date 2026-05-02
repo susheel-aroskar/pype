@@ -25,16 +25,6 @@ class ForbiddenError(PypeError):
     code = "FORBIDDEN"
 
 
-class ClientQueueGoneError(PypeError):
-    status_code = status.HTTP_410_GONE
-    code = "CLIENT_QUEUE_GONE"
-
-
-class ClientQueueNotFoundError(PypeError):
-    status_code = status.HTTP_400_BAD_REQUEST
-    code = "CLIENT_QUEUE_NOT_FOUND"
-
-
 class TimeoutOutOfRangeError(PypeError):
     status_code = status.HTTP_400_BAD_REQUEST
     code = "TIMEOUT_OUT_OF_RANGE"

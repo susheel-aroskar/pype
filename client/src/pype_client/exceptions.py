@@ -14,10 +14,6 @@ class PypeBadRequestError(PypeClientError):
     """Server returned 400 Bad Request."""
 
 
-class PypeClientGoneError(PypeClientError):
-    """Server returned 410 Gone — the addressed client queue no longer exists."""
-
-
 class PypeTimeoutError(PypeClientError, TimeoutError):
     """Server returned 503 (queue full at deadline) or local deadline elapsed."""
 

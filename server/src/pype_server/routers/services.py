@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, 
 
 from pype_server.config import Settings, get_settings
 from pype_server.deps import ClientRegistryDep, ServiceRegistryDep
-from pype_server.exceptions import ForbiddenError, RoleMismatchError
+from pype_server.exceptions import RoleMismatchError
 from pype_server.messaging import PypeRequest
 from pype_server.queueing import normalize_timeout, queue_get, queue_put
 from pype_server.security import ClientClaims, ServiceClaims, client_claims, service_claims
@@ -43,9 +43,12 @@ async def post_request_to_service(
     block: Annotated[bool, Query()] = False,
     content_type: Annotated[str | None, Header(alias="Content-Type")] = None,
 ) -> Response:
-    entry = registry.get(claims["client_id"])
-    if entry is None:
-        raise ForbiddenError("client not registered")
+    # JWT signature already validated by `client_claims` above. The client_id is a
+    # 256-bit random unguessable string, signed by us — no further authority check is
+    # needed. The client_registry entry is lazy-created so a client whose JWT was issued
+    # by another pype instance (in a clustered deployment) gets a fresh queue here on
+    # demand.
+    entry = registry.get_or_create(claims["client_id"])
 
     # POSTing a request proves client liveness. Bump before the (potentially blocking)
     # enqueue so the reaper doesn't evict mid-call, and again after so the next call has

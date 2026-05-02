@@ -66,7 +66,6 @@ from pype_client import (
     ClientAuthRequest,
     ClientRequest,
     PypeClient,
-    PypeClientGoneError,
     PypeTimeoutError,
     ServiceAuthRequest,
     ServiceClient,
@@ -233,15 +232,12 @@ class BackendService:
                     client_request = connection.get_request(timeout=200)
                 except PypeTimeoutError:
                     continue
-                try:
-                    self.process_one_request(client_request)
-                except PypeClientGoneError:
-                    # The originating client closed before we could send the response.
-                    # This is a normal pype scenario (e.g., quorum reached -> client moved
-                    # on); the response is dropped on the floor and we continue serving.
-                    self._log(
-                        f"client {client_request.client_id} closed before response sent — drop"
-                    )
+                # Note: in the lazy-create model, a `send_response` to a client that has
+                # already closed (e.g., Carol's quorum filled and she moved on) does NOT
+                # raise — the server simply lazy-creates a fresh queue and enqueues. The
+                # response sits there orphaned and the reaper cleans it up later. From
+                # the service's perspective: just respond and move on, no error path.
+                self.process_one_request(client_request)
             self._log("shutting down")
 
     def process_one_request(self, client_request: ClientRequest) -> None:

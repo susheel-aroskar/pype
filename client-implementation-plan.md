@@ -59,7 +59,7 @@ It exposes the method `send_response()`. The service is responsible for picking 
     - timeout as a query parameter
     - `Content-Type` HTTP request header set to `content_type`
     - request body is the response payload (bytes) to be returned to the original client
-- Throws an appropriate application exception / timeout exception depending on the status code if the status code is not `202 Accepted` — for example, 410 (client gone), 400, 403, or 503 (timeout).
+- Throws an appropriate application exception / timeout exception depending on the status code if the status code is not `202 Accepted` — for example, 400, 403, or 503 (timeout).
 
 
 ---
@@ -134,7 +134,7 @@ This method returns a response for the request identified by `request_id`, submi
 The `ClientConnection.get_response(request_id)` method internally handles this by,
     1. First checking if a `ServiceResponse` for the given `request_id` is already stored inside the internal (request_id -> ServiceResponse) map that the ClientConnection maintains. This could have been populated by any previous call to one of the `get_response*()` methods (see below). If present, it is **popped** from the internal map and returned to the caller. In this case no actual GET REST request needs to be made to the pype server.
     2. If the response is not found in the internal map, the ClientConnection sends a GET REST request to `/clients/{client_id}` with `timeout` set to the remaining deadline. The very first call calculates the final deadline as `now + timeout`. Each subsequent REST call uses the remaining time to that original deadline as its `timeout` query parameter. If the returned response has the requested `request_id`, it is returned directly to the caller (not stored). If it has some other `request_id`, a `ServiceResponse` is stored in the internal map keyed by that other `request_id` for future lookups, and the loop iterates.
-    3. The loop terminates when either (a) the requested `request_id` is found, or (b) the server returns any status other than 200 OK (e.g., 204 No Content on server-side timeout, or 400 / 403 / 410), or (c) the local deadline is exhausted. In cases (b) and (c) a `TimeoutError` is raised. Cached `ServiceResponse`s for other request_ids remain in the internal map.
+    3. The loop terminates when either (a) the requested `request_id` is found, or (b) the server returns any status other than 200 OK (e.g., 204 No Content on server-side timeout, or 400 / 403), or (c) the local deadline is exhausted. In cases (b) and (c) a `TimeoutError` is raised. Cached `ServiceResponse`s for other request_ids remain in the internal map.
     - All REST requests to the pype endpoints are blocking requests with timeout.
 
 All the other `get_response*()` methods below that look like they are doing parallel or async request/response handling are actually minor variations of the looping logic above and internally use single-threaded blocking REST calls only.

@@ -58,7 +58,7 @@ class ClientRequest(_PayloadAccessors):
         - `response` may be `str` (encoded as UTF-8) or `bytes` (sent as-is).
         - `timeout` in milliseconds: 0 = non-blocking; positive = block up to this many ms;
           None = block up to the server's max.
-        - Raises a `PypeClientError` subclass on non-202 status (410, 400, 403, 503).
+        - Raises a `PypeClientError` subclass on non-202 status (400, 403, 503).
         """
         self._connection._send_response(self, response, content_type, timeout)
 

@@ -145,16 +145,24 @@ async def test_post_rejects_out_of_range_timeout(client: AsyncClient, bad_timeou
 async def test_post_to_service_bumps_client_last_seen(app: object, client: AsyncClient) -> None:
     cl = await _auth_client(client)
     registry = app.state.client_registry  # type: ignore[attr-defined]
-    entry = registry.get(cl["client_id"])
-    assert entry is not None
-    before = entry.last_seen
-    await asyncio.sleep(0.02)
-    r = await client.post(
+    # First POST lazy-creates the entry; capture last_seen from there, then assert a
+    # second POST advances it.
+    r1 = await client.post(
         "/services/billing?request_id=r1",
         headers={**auth_header(str(cl["access_token"])), "Content-Type": "text/plain"},
         content=b"x",
     )
-    assert r.status_code == 202
+    assert r1.status_code == 202
+    entry = registry.get(cl["client_id"])
+    assert entry is not None
+    before = entry.last_seen
+    await asyncio.sleep(0.02)
+    r2 = await client.post(
+        "/services/billing?request_id=r2",
+        headers={**auth_header(str(cl["access_token"])), "Content-Type": "text/plain"},
+        content=b"x",
+    )
+    assert r2.status_code == 202
     assert entry.last_seen > before
 
 

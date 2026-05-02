@@ -14,7 +14,6 @@ import requests
 from pype_client.exceptions import (
     PypeAuthError,
     PypeBadRequestError,
-    PypeClientGoneError,
     PypeForbiddenError,
     PypeNetworkError,
     PypeProtocolError,
@@ -51,8 +50,6 @@ def raise_for_status(resp: requests.Response, *, expected_codes: set[int]) -> No
         raise PypeBadRequestError(detail)
     if status == 403:
         raise PypeForbiddenError(detail)
-    if status == 410:
-        raise PypeClientGoneError(detail)
     if status == 503:
         raise PypeTimeoutError(detail)
     raise PypeProtocolError(f"unexpected status {status}: {detail}")

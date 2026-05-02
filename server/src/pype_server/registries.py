@@ -32,25 +32,33 @@ class ServiceRegistry:
 class ClientRegistry:
     """Holds one in-memory `ClientEntry` per active client, keyed by `client_id`.
 
-    The `client_id` is a 256-bit random URL-safe string that doubles as the client's
-    capability: knowing the id is what proves authority over the client's queue. There is
-    no separate `client_secret` in this design — the id is unguessable, so we only need
-    to check that an entry with that id exists in the registry.
+    The `client_id` is a 256-bit random URL-safe string signed into the client's JWT.
+    The JWT signature is the sole authority — knowing the id (and a server-signed JWT
+    that contains it) is what proves authority over the queue. There is no separate
+    secret. Entries are created lazily by `get_or_create` on first use of the
+    `/clients/{client_id}` endpoint (either a service POSTing a response, or the
+    client itself GETting); `POST /auth/client` does NOT pre-register an entry.
+
+    Lazy creation is deliberately friendly to a clustered deployment: a client whose
+    JWT lands on a previously-unseen Pype instance just gets a fresh queue there.
+    The reaper sweeps abandoned queues by `last_seen` threshold.
     """
 
     def __init__(self, queue_max_size: int) -> None:
         self._queue_max_size = queue_max_size
         self._entries: dict[str, ClientEntry] = {}
 
-    def register(self, client_id: str) -> ClientEntry:
-        """Register a new client and return its entry.
+    def get_or_create(self, client_id: str) -> ClientEntry:
+        """Return the entry for `client_id`, creating one with an empty queue if missing.
 
-        The caller is responsible for supplying a `client_id` that is not already in the
-        registry. In this codebase the only caller is `POST /auth/client`, which uses
-        `secrets.token_urlsafe(32)` — 256 bits of entropy. Collisions among live clients
-        are cryptographically unreachable (~2^-196 even at one billion concurrent clients),
-        so we do not check.
+        Single-threaded asyncio means no lock is needed: between the dict lookup and
+        the dict insert there are no `await` points, so no other coroutine can race
+        in to insert the same key. Collisions among 256-bit random ids are
+        cryptographically unreachable (~2^-196 even at one billion concurrent clients).
         """
+        existing = self._entries.get(client_id)
+        if existing is not None:
+            return existing
         queue: asyncio.Queue[PypeResponse] = asyncio.Queue(maxsize=self._queue_max_size)
         entry = ClientEntry(client_id=client_id, queue=queue)
         self._entries[client_id] = entry

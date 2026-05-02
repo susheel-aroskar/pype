@@ -22,8 +22,8 @@ def _new_reaper(
 
 
 def test_reaper_evicts_stale_entries(registry: ClientRegistry) -> None:
-    a = registry.register("a")
-    b = registry.register("b")
+    a = registry.get_or_create("a")
+    b = registry.get_or_create("b")
     a.last_seen = time.monotonic() - 100  # stale
     # b is fresh
     reaper = _new_reaper(registry, threshold=10)
@@ -34,7 +34,7 @@ def test_reaper_evicts_stale_entries(registry: ClientRegistry) -> None:
 
 
 def test_reaper_keeps_fresh_entries(registry: ClientRegistry) -> None:
-    a = registry.register("a")
+    a = registry.get_or_create("a")
     reaper = _new_reaper(registry, threshold=100)
     assert reaper._tick() == 0
     assert registry.get(a.client_id) is a
@@ -42,7 +42,7 @@ def test_reaper_keeps_fresh_entries(registry: ClientRegistry) -> None:
 
 def test_reaper_resumes_across_ticks_with_small_batch(registry: ClientRegistry) -> None:
     for i in range(5):
-        e = registry.register(f"s{i}")
+        e = registry.get_or_create(f"s{i}")
         e.last_seen = time.monotonic() - 100  # all stale
     reaper = _new_reaper(registry, threshold=10, batch_size=2)
     evicted_per_tick = [reaper._tick() for _ in range(3)]
@@ -51,8 +51,8 @@ def test_reaper_resumes_across_ticks_with_small_batch(registry: ClientRegistry) 
 
 
 def test_reaper_handles_concurrent_removal_silently(registry: ClientRegistry) -> None:
-    a = registry.register("a")
-    b = registry.register("b")
+    a = registry.get_or_create("a")
+    b = registry.get_or_create("b")
     a.last_seen = time.monotonic() - 100
     b.last_seen = time.monotonic() - 100
     reaper = _new_reaper(registry, threshold=10, batch_size=10)
@@ -67,14 +67,14 @@ def test_reaper_handles_concurrent_removal_silently(registry: ClientRegistry) ->
 
 
 def test_reaper_takes_fresh_snapshot_when_cursor_exhausted(registry: ClientRegistry) -> None:
-    a = registry.register("a")
+    a = registry.get_or_create("a")
     a.last_seen = time.monotonic() - 100
     reaper = _new_reaper(registry, threshold=10)
     assert reaper._tick() == 1
     assert reaper._cursor_idx == 1
     # Now add a new stale entry; the cursor was exhausted, so the next tick should
     # re-snapshot and pick it up.
-    b = registry.register("b")
+    b = registry.get_or_create("b")
     b.last_seen = time.monotonic() - 100
     assert reaper._tick() == 1
     assert registry.get(b.client_id) is None

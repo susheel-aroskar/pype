@@ -9,7 +9,6 @@ from pype_client import (
     ClientAuthRequest,
     ClientRequest,
     PypeClient,
-    PypeClientGoneError,
     PypeForbiddenError,
     PypeTimeoutError,
     ServiceAuthRequest,
@@ -119,8 +118,15 @@ def test_send_request_503_when_service_queue_full(server_base_url: str) -> None:
             conn.send_request("filler-svc", b"x", content_type="text/plain", timeout=0)
 
 
-def test_close_releases_client_queue(server_base_url: str) -> None:
-    """After close(), POST to /clients/{id} should 410 from the server."""
+def test_send_response_after_client_closed_succeeds_silently(server_base_url: str) -> None:
+    """In the lazy-create model, the server no longer 410s a service POST to a client
+    that has logged off. The server simply lazy-creates a fresh queue, enqueues the
+    response, and returns 202. The response is orphaned and the reaper will clean up
+    the queue eventually — but the service's POST is not an error.
+
+    This is the price of cluster-friendly lazy creation: a service can never tell, just
+    from a single POST, whether the originating client is still listening. That's
+    fine: services are stateless processors, not coordinators."""
     s = _client_settings(server_base_url)
     pc = PypeClient(settings=s)
     sc = ServiceClient(settings=s)
@@ -130,15 +136,15 @@ def test_close_releases_client_queue(server_base_url: str) -> None:
     rid = conn.send_request("logoff-test", b"x", content_type="text/plain")
     conn.close()
 
-    # A service trying to respond to that client now should hit 410. Easiest path: have a
-    # service drain the queue, then try to respond.
+    # The service drains the queue and responds. POST silently succeeds even though
+    # there's no live consumer of the response.
     with sc.authenticate(ServiceAuthRequest(service_name="logoff-test")) as svc:
         req: ClientRequest = svc.get_request(timeout=2000)
         assert req.client_id == client_id
         assert req.request_id == rid
-        # Reuse the request_id — but the client's queue is gone now.
-        with pytest.raises(PypeClientGoneError):
-            req.send_response(b"too late", content_type="text/plain")
+        # No exception expected; the response gets enqueued in a re-created queue
+        # that nobody will ever drain.
+        req.send_response(b"too late", content_type="text/plain")
 
 
 def test_get_response_after_close_raises(server_base_url: str) -> None:
