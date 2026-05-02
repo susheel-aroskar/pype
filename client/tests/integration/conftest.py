@@ -53,6 +53,11 @@ def server_base_url() -> Iterator[str]:
             "PYPE_SERVER_CLIENT_INACTIVITY_THRESHOLD_SECONDS": "3600",
         }
     )
+    # Don't capture server stdout/stderr in this fixture: let uvicorn's output flow
+    # through to the parent process. With `--log-level warning`, the success case
+    # stays quiet, but a server-side traceback (e.g., on an unexpected 500) becomes
+    # visible — pytest will buffer it and surface it on test failure rather than
+    # silently swallowing it into an unread PIPE.
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -67,8 +72,6 @@ def server_base_url() -> Iterator[str]:
             "warning",
         ],
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
     )
     try:
         _wait_for_server(base_url)

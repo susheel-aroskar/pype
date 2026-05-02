@@ -27,7 +27,10 @@ async def queue_put(queue: asyncio.Queue[T], item: T, timeout_ms: int) -> bool:
     try:
         await asyncio.wait_for(queue.put(item), timeout=timeout_ms / 1000)
         return True
-    except TimeoutError:
+    # On Python 3.10 `asyncio.TimeoutError` is its own class (inherits from Exception);
+    # only on 3.11+ is it an alias of the built-in `TimeoutError`. Catching the asyncio
+    # one explicitly works on every supported Python.
+    except asyncio.TimeoutError:
         return False
 
 
@@ -40,5 +43,5 @@ async def queue_get(queue: asyncio.Queue[T], timeout_ms: int) -> T | None:
             return None
     try:
         return await asyncio.wait_for(queue.get(), timeout=timeout_ms / 1000)
-    except TimeoutError:
+    except asyncio.TimeoutError:  # see queue_put for the 3.10/3.11 rationale
         return None
