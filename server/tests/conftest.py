@@ -16,6 +16,7 @@ def make_test_settings(**overrides: object) -> Settings:
         # Tests that exercise the reaper instantiate ClientQueueReaper directly.
         "client_reaper_period_seconds": 3600.0,
         "client_reaper_batch_size": 1000,
+        "client_reaper_target_sweep_seconds": 3600.0,
         "client_inactivity_threshold_seconds": 3600.0,
         # Pin internal_ip so tests don't make real DNS / socket calls and so assertions
         # against the X-Pype-Server-IP header have a deterministic value to compare.

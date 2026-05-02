@@ -11,13 +11,21 @@ def registry() -> ClientRegistry:
 
 
 def _new_reaper(
-    registry: ClientRegistry, threshold: float, batch_size: int = 1000
+    registry: ClientRegistry,
+    threshold: float,
+    batch_size: int = 1000,
+    period_seconds: float = 0.01,
+    target_sweep_seconds: float = 1.0,
 ) -> ClientQueueReaper:
+    # Defaults yield ticks_per_sweep = 100, so the dynamic batch_size only kicks in
+    # for registries above ~100k entries — well above what individual unit tests build.
+    # That keeps the existing tests' batch_size assumption (1000 floor) intact.
     return ClientQueueReaper(
         registry=registry,
-        period_seconds=0.01,  # never relied on in unit tests; we call _tick directly
+        period_seconds=period_seconds,
         batch_size=batch_size,
         inactivity_threshold_seconds=threshold,
+        target_sweep_seconds=target_sweep_seconds,
     )
 
 
@@ -83,3 +91,70 @@ def test_reaper_takes_fresh_snapshot_when_cursor_exhausted(registry: ClientRegis
 def test_reaper_no_op_on_empty_registry(registry: ClientRegistry) -> None:
     reaper = _new_reaper(registry, threshold=10)
     assert reaper._tick() == 0
+
+
+# ---------------------------------------------------------------------------
+# _effective_batch_size scales with registry size
+# ---------------------------------------------------------------------------
+
+
+def test_effective_batch_size_uses_floor_for_small_registries(
+    registry: ClientRegistry,
+) -> None:
+    """If the registry is small, the dynamic-scale calculation produces a tiny per-tick
+    target; the floor (`batch_size`) wins. Small registries get swept in one go."""
+    for i in range(50):
+        registry.get_or_create(f"c{i}")
+    # period=1, target_sweep=10 -> 10 ticks per sweep -> 50/10 = 5 per tick by scale.
+    # Floor of 1000 wins: full registry in one tick.
+    reaper = _new_reaper(
+        registry, threshold=100, batch_size=1000, period_seconds=1.0, target_sweep_seconds=10.0
+    )
+    assert reaper._effective_batch_size() == 1000
+
+
+def test_effective_batch_size_scales_up_for_large_registries(
+    registry: ClientRegistry,
+) -> None:
+    """For a registry larger than `min_batch * ticks_per_sweep`, the scale calculation
+    wins and the per-tick batch grows so the full sweep still finishes within the
+    target window."""
+    for i in range(50_000):
+        registry.get_or_create(f"c{i}")
+    # period=1, target_sweep=10 -> 10 ticks per sweep -> 50_000/10 = 5000 per tick.
+    # Floor of 1000 loses; scale wins.
+    reaper = _new_reaper(
+        registry, threshold=100, batch_size=1000, period_seconds=1.0, target_sweep_seconds=10.0
+    )
+    assert reaper._effective_batch_size() == 5000
+
+
+def test_effective_batch_size_handles_target_smaller_than_period(
+    registry: ClientRegistry,
+) -> None:
+    """If target_sweep_seconds < period_seconds, ticks_per_sweep clamps to 1 and the
+    reaper sweeps the entire registry every tick."""
+    for i in range(2500):
+        registry.get_or_create(f"c{i}")
+    reaper = _new_reaper(
+        registry, threshold=100, batch_size=1000, period_seconds=10.0, target_sweep_seconds=1.0
+    )
+    # ticks_per_sweep clamps to 1 -> 2500 per tick. Floor of 1000 loses.
+    assert reaper._effective_batch_size() == 2500
+
+
+def test_dynamic_batch_drains_large_registry_within_target_ticks(
+    registry: ClientRegistry,
+) -> None:
+    """End-to-end: a registry of 1000 stale entries with batch_size=100 floor and a
+    target of 10 ticks should drain in 10 ticks because 1000/10 = 100 entries per tick."""
+    for i in range(1000):
+        e = registry.get_or_create(f"s{i}")
+        e.last_seen = time.monotonic() - 1000  # all stale
+    reaper = _new_reaper(
+        registry, threshold=10, batch_size=100, period_seconds=1.0, target_sweep_seconds=10.0
+    )
+    # 10 ticks at 100/tick should fully drain.
+    for _ in range(10):
+        reaper._tick()
+    assert len(registry) == 0

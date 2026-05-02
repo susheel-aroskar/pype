@@ -186,7 +186,8 @@ Client queues are transient. If a client never calls DELETE on `/auth/client`, i
 
 ## Configuration (in `app/config.py`)
 - `client_reaper_period_seconds: int = 60` — how often the reaper runs.
-- `client_reaper_batch_size: int = 1000` — max number of `client_registry` entries the reaper will examine in a single tick.
+- `client_reaper_batch_size: int = 1000` — **minimum** number of `client_registry` entries the reaper examines per tick. Floor; the actual batch scales up with registry size (see below).
+- `client_reaper_target_sweep_seconds: int = 600` — target wall-clock latency for one full sweep regardless of registry size. The per-tick batch is `max(batch_size, ceil(registry_size / (target_sweep_seconds / period_seconds)))`. Small registries do at most `batch_size` per tick; very large registries scale up so abandoned entries don't sit around for hours. Default 600s = 10 min, matching the inactivity threshold so stale entries are caught within roughly one threshold window.
 - `client_inactivity_threshold_seconds: int = 600` — entries with `now - last_seen > threshold` are evicted. Default 10 minutes; this is comfortably larger than the 8-minute max blocking-GET timeout, so a client doing a long blocking GET that times out and immediately retries will not be reaped between calls.
 
 ## Lifecycle

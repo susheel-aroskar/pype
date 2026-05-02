@@ -80,7 +80,29 @@ class Settings(BaseSettings):
     service_queue_max_size: int = Field(default=8000, ge=1)
 
     client_reaper_period_seconds: float = Field(default=60.0, gt=0)
-    client_reaper_batch_size: int = Field(default=1000, ge=1)
+    client_reaper_batch_size: int = Field(
+        default=1000,
+        ge=1,
+        description=(
+            "MINIMUM number of registry entries the reaper examines per tick. The actual "
+            "per-tick batch scales up with registry size to keep full-sweep latency "
+            "bounded by `client_reaper_target_sweep_seconds` (see below). Small "
+            "registries always do at least this many per tick so they can be swept in "
+            "one go without artificial throttling."
+        ),
+    )
+    client_reaper_target_sweep_seconds: float = Field(
+        default=600.0,
+        gt=0,
+        description=(
+            "Target wall-clock time for the reaper to complete a full sweep of the "
+            "client registry, regardless of size. The reaper computes its per-tick "
+            "batch as `max(client_reaper_batch_size, ceil(registry_size / "
+            "(target_sweep_seconds / period_seconds)))`. Default 600s = 10 min, which "
+            "matches the default inactivity threshold so stale entries are caught "
+            "within roughly one threshold window."
+        ),
+    )
     client_inactivity_threshold_seconds: float = Field(default=600.0, gt=0)
 
     default_content_type: str = Field(default="application/json")

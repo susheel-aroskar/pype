@@ -30,6 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         period_seconds=cfg.client_reaper_period_seconds,
         batch_size=cfg.client_reaper_batch_size,
         inactivity_threshold_seconds=cfg.client_inactivity_threshold_seconds,
+        target_sweep_seconds=cfg.client_reaper_target_sweep_seconds,
     )
 
     @asynccontextmanager
