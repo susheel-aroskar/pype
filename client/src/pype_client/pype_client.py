@@ -10,7 +10,6 @@ import logging
 import time
 from collections.abc import Callable, Iterable
 from types import TracebackType
-from typing import Self
 
 import requests
 
@@ -403,7 +402,7 @@ class ClientConnection:
         self._next_request_id += 1
         return str(self._next_request_id)
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> ClientConnection:
         return self
 
     def __exit__(

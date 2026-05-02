@@ -73,14 +73,12 @@ from pype_client import (
 )
 from pype_client.config import Settings
 
-# ============================================================================
-# Console output helpers — colored, prefixed, thread-safe.
-# ============================================================================
-#
-# Threads can interleave print() calls and produce mangled output. A single
-# global lock around every line keeps the transcript readable.
 
-
+# ANSI escape sequences for terminal colors. Defined up here because services and
+# callers reference these as class-attribute defaults (e.g. `DISPLAY_COLOR = Ansi.GREEN`),
+# which are evaluated at class-definition time — so `Ansi` must already exist by then.
+# The thread-safe print helpers further down can stay there because they're used from
+# method bodies (evaluated at call time, not class-definition time).
 class Ansi:
     """ANSI escape sequences for terminal colors. Any modern terminal supports these."""
 
@@ -101,30 +99,6 @@ class Ansi:
     # Neutrals
     GREY = "\x1b[37m"
     BRIGHT_WHITE = "\x1b[97m"
-
-
-_PRINT_LOCK = threading.Lock()
-
-
-def _say(prefix: str, color: str, message: str, *, indent: int = 0) -> None:
-    """Print a single tagged, colored line atomically. `indent` is leading spaces."""
-    with _PRINT_LOCK:
-        print(f"{' ' * indent}{Ansi.BOLD}{color}[ {prefix} ]{Ansi.RESET}  {message}")
-
-
-def log_client(prefix: str, color: str, message: str) -> None:
-    """Client transcripts are flush-left."""
-    _say(prefix, color, message, indent=0)
-
-
-def log_service(prefix: str, color: str, message: str) -> None:
-    """Service transcripts are indented to the right so they read like a swim-lane diagram."""
-    _say(prefix, color, message, indent=48)
-
-
-def banner(message: str) -> None:
-    with _PRINT_LOCK:
-        print(f"\n{Ansi.BOLD}{Ansi.BRIGHT_WHITE}{'═' * 78}\n  {message}\n{'═' * 78}{Ansi.RESET}")
 
 
 # ============================================================================
@@ -382,8 +356,8 @@ class DiceRollService(BackendService):
 #       These methods block waiting for the requested response(s), but
 #       they don't drive any work themselves — they just pull from this
 #       client's per-client queue on pype. Behind the scenes, while you
-#       were doing other things, the chosen backend service was pulling
-#       your request, processing it, and POSTing its response into your
+#       were doing other things, the chosen backend services were pulling
+#       your requests, processing it, and POSTing their responses into your
 #       queue. Every variant returns ServiceResponse objects you can
 #       decode with `.bytes` / `.text` / `.json()`.
 #
@@ -739,3 +713,38 @@ def test_demo(server_base_url: str) -> None:
             service.stop()
         for service in services:
             service.raise_if_failed()
+
+
+# ============================================================================
+# Console output helpers — colored, prefixed, thread-safe.
+# ============================================================================
+#
+# Threads can interleave print() calls and produce mangled output. A single
+# global lock around every line keeps the transcript readable. The `Ansi`
+# class itself lives at the top of the file because services and callers
+# reference its values as class-attribute defaults.
+
+
+_PRINT_LOCK = threading.Lock()
+
+
+def _say(prefix: str, color: str, message: str, *, indent: int = 0) -> None:
+    """Print a single tagged, colored line atomically. `indent` is leading spaces."""
+    with _PRINT_LOCK:
+        print(f"{' ' * indent}{Ansi.BOLD}{color}[ {prefix} ]{Ansi.RESET}  {message}")
+
+
+def log_client(prefix: str, color: str, message: str) -> None:
+    """Client transcripts are flush-left."""
+    _say(prefix, color, message, indent=0)
+
+
+def log_service(prefix: str, color: str, message: str) -> None:
+    """Service transcripts are indented to the right so they read like a swim-lane diagram."""
+    _say(prefix, color, message, indent=48)
+
+
+def banner(message: str) -> None:
+    with _PRINT_LOCK:
+        print(f"\n{Ansi.BOLD}{Ansi.BRIGHT_WHITE}{'═' * 78}\n  {message}\n{'═' * 78}{Ansi.RESET}")
+

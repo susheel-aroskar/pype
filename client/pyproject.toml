@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pype-client"
 version = "0.1.0"
 description = "Synchronous, blocking client library for the pype rendezvous server."
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "requests>=2.31",
     "pydantic>=2.5",

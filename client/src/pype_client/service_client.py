@@ -7,7 +7,6 @@ Not thread-safe: instantiate one ServiceConnection per thread if you need concur
 from __future__ import annotations
 
 from types import TracebackType
-from typing import Self
 
 import requests
 
@@ -171,7 +170,7 @@ class ServiceConnection:
         if self._closed:
             raise RuntimeError("ServiceConnection is closed")
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> ServiceConnection:
         return self
 
     def __exit__(
